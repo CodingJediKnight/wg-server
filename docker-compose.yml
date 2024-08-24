@@ -1,0 +1,61 @@
+services:
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:${WG_EASY_VERSION}
+    container_name: wg-easy
+    environment:
+      - LANG=${LANG}
+      - WG_HOST=${HOST}
+      - PORT=${PORT}
+      - WG_PORT=${WG_PORT}
+      - PASSWORD_HASH=${PASSWORD_HASH}
+      - UI_TRAFFIC_STATS=${UI_TRAFFIC_STATS}
+      - UI_CHART_TYPE=${UI_CHART_TYPE}
+      - WG_ENABLE_ONE_TIME_LINKS=${WG_ENABLE_ONE_TIME_LINKS}
+      - UI_ENABLE_SORT_CLIENTS=${UI_ENABLE_SORT_CLIENTS}
+      - WG_ENABLE_EXPIRES_TIME=${WG_ENABLE_EXPIRES_TIME}
+      - ENABLE_PROMETHEUS_METRICS=${ENABLE_PROMETHEUS_METRICS}
+      - PROMETHEUS_METRICS_PASSWORD=${PROMETHEUS_METRICS_PASSWORD}
+    volumes:
+      - etc_wireguard:/etc/wireguard
+    ports:
+      - "${WG_PORT}:${WG_PORT}/udp"
+      - "${PORT}:${PORT}/tcp"
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+      # - NET_RAW # ⚠️ Uncomment if using Podman
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.wg.loadbalancer.server.port=${PORT}"
+      - "traefik.http.routers.wg.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.wg.entrypoints=websecure"
+      - "traefik.http.routers.wg.tls=true"
+      - "traefik.http.routers.wg.tls.certresolver=MainCertResolver"
+
+  traefik:
+    image: traefik:${TRAEFIK_VERSION}
+    command:
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.MainCertResolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.MainCertResolver.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.MainCertResolver.acme.storage=/letsencrypt/acme.json"
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - traefik_letsencrypt_data:/letsencrypt
+
+volumes:
+  etc_wireguard:
+  traefik_letsencrypt_data:
