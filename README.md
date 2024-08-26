@@ -1,6 +1,14 @@
 # wg-server
 
 ## Init
+### Docker install
+```bash
+git clone https://github.com/docker/docker-install.git /tmp/docker-install
+/tmp/docker-install/install.sh
+/tmp/docker-install/rootless-install.sh install
+sudo usermod -aG docker $USER
+newgrp docker
+```
 ### Config prepare
 ```bash
 cp .env.example .env
